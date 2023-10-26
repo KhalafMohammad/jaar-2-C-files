@@ -88,8 +88,8 @@ int main(int argc, char *argv[])
 		// RGB (39, 174, 96) should be a green grass color
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		SDL_RenderClear(renderer);
-        process_input(punten);
-		// Process selected inputs and pay close attention to moving
+        process_input(punten);// Process selected inputs and pay close attention to moving
+		
 		SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);//green triangle
         for (int i = 0; i < pointscount; i++)
         {
