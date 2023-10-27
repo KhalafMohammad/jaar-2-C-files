@@ -148,81 +148,92 @@ void rawterm_immediate_erasedisp() {
 
 // Your solution / code for the state machine parts goes here:
 
-typedef enum{
+// states heb ik voor de lampen gemaakt 
+typedef enum _state_{
 
-    NONE_ON,
-    L1_ON,
-    L2_ON,
-    L3_ON,
+    NONE_ON,// eerst dit 
+    L1_ON,	// 1
+    L2_ON,	// 2
+    L3_ON,	// 3
     num_states
 
 }lamp_state;
 
-typedef enum{
+// event heb ik voor de buttons gemaakt
+typedef enum _event_{
 
-    BUTTON_P1,
-    BUTTON_P2,
-    NONE_PRESSED
+    BUTTON_P1,	//button 1 (0)
+    BUTTON_P2,	//button 2 (1)
+    NONE_PRESSED	// teller (3) dus 3 states
 
 }input_event;
 
+//handlers functie pointer
 typedef lamp_state (*event_handeler_t)(void);
 
-
+//struct voor de array
 typedef struct
 {
-    lamp_state state;
-    input_event event;
-    event_handeler_t handler;
+    lamp_state state; // eerst state
+    input_event event;// dan event
+    event_handeler_t handler;//dan functie
     
 }state_transition_rule;
 
-
-lamp_state P1_pressed(void){
+//functies voor handler
+lamp_state P1_handler(void){
 
     printf("Button 1 pressed, (L1 ON), event handeld. state (1).\r\n");
     return L1_ON;
 }
 
-lamp_state P2_pressed(void){
+lamp_state P2_handler(void){
 
     printf("Button 2 pressed, (L1 ON),event handeld. state (1).\r\n");
     return L1_ON;
 }
 
-lamp_state L1_ON_P1_pressed(void){
+lamp_state L1_ON_P1_handler(void){
 
     printf("Button 1 pressed while L1 is ON, turning (L1 OFF) en turning (L2 ON), event handeld. state (2).\r\n");
     return L2_ON;
 }
 
-lamp_state L1_ON_P2_pressed(void){
+lamp_state L1_ON_P2_handler(void){
 
     printf("Button 2 pressed while L1 is ON,truning (L1 OFF) en turning (L3 ON), event handeld. state (2).\r\n");
     return L3_ON;
 }
-lamp_state L2_ON_P1_or_P2_pressed(void){
+lamp_state L2_ON_P1_or_P2_handler(void){
 
-    printf("Button 1 pressed while L2 is ON,Turning (L2 OFF), event handeld. state (3).\r\n");
+    printf("Button pressed while L2 is ON,Turning (L2 OFF), event handeld. state (3).\r\n");
     return NONE_ON;
 }
 
 
-lamp_state L3_ON_P1_or_P2_pressed(void){
+lamp_state L3_ON_P1_or_P2_handler(void){
 
-    printf("Button 1 pressed while L3 is ON, Turning (L3 OFF), event handeld. state (3).\r\n");
+    printf("Button pressed while L3 is ON, Turning (L3 OFF), event handeld. state (3).\r\n");
     return NONE_ON;
 }
 
-
+//eerst array is voor button 1
 state_transition_rule state_transition_rules[] = {
-    {NONE_ON, BUTTON_P1, P1_pressed},
-    {NONE_ON, BUTTON_P2, P2_pressed},
-    {L1_ON, BUTTON_P1, L1_ON_P1_pressed},
-    {L1_ON, BUTTON_P2, L1_ON_P2_pressed},
-    {L2_ON, BUTTON_P1, L2_ON_P1_or_P2_pressed},
-    {L3_ON, BUTTON_P2, L3_ON_P1_or_P2_pressed}
+    {NONE_ON, BUTTON_P1, P1_handler}, //eerst none_on
+    {L1_ON, BUTTON_P1, L1_ON_P1_handler},
+    {L2_ON, BUTTON_P1, L2_ON_P1_or_P2_handler},
+	{L3_ON, BUTTON_P1, L3_ON_P1_or_P2_handler}//als l3_on state is active from array 2 and p1 is clicked this turns it of
+    
 };
+
+//tweede array is voor button 2
+state_transition_rule state_transition_rules2[] = {
+    {NONE_ON, BUTTON_P2, P2_handler},
+    {L1_ON, BUTTON_P2, L1_ON_P2_handler},
+    {L2_ON, BUTTON_P2, L2_ON_P1_or_P2_handler},//als l2_on state is active from array 1 and p2 is clicked this turns it of
+    {L3_ON, BUTTON_P2, L3_ON_P1_or_P2_handler}
+};
+
 
 
 
@@ -238,11 +249,11 @@ input_event rawterm_handle_keypress() {
 			rawterm_immediate_erasedisp();
 			exit(0);
 			break;
-		case 'z': // handle other key presses like so:
+		case 'z': // handle key voor button 1
 			printf("Button 1 pressed, state triggered\r\n");
 			e = BUTTON_P1;
 			break;
-        case 'x': // handle other key presses like so:
+        case 'x': // handle key voor button 2
 		    printf("Button 2 pressed, state triggered\r\n");
 		    e = BUTTON_P2;
 		    break;
@@ -276,9 +287,13 @@ int main() {
 		// If it times out, rawterm_read_key() just returns 0 chars
 		// and this while just keeps re-iterating until CTRL-Q:
 		e = rawterm_handle_keypress();
-        if (s < num_states && e < NONE_PRESSED && (state_transition_rules[s].event == e))
+        if (s < num_states && e < NONE_PRESSED && (state_transition_rules[s].event == e))//eerste if for button 1 array 1
         {
             s = (*state_transition_rules[s].handler)();
+        }
+		else if (s < num_states && e < NONE_PRESSED && (state_transition_rules2[s].event == e))//tweede if voor button2 array 2
+        {
+            s = (*state_transition_rules2[s].handler)();
         }
         printf("current state is %d\r\n",(int)s);
         

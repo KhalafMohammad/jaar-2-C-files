@@ -1,71 +1,28 @@
-#include <stdio.h>
+#include <stdio.h> //standaard c functies
 #include <time.h> //include for random nums
-#include <stdlib.h>
-#include <SDL2/SDL.h>
-#include <math.h>
-// #include "header.h"
+#include <stdlib.h> //voor rand()
+#include <SDL2/SDL.h> //voor SDL-gerelateerde functies
+#include <math.h> // voor sqrt() en pow() en round()
+#include "header.h"
 
-#define SC_MULTIPLIER 1 // screen multiplier change to 2 for 4k or (1.5 for 1080p ,1.3333 for 1440p if you want)
-
-#define Point_mover_PLAIN_WIDTH 1260 * SC_MULTIPLIER  // 1260 ,1900 for small screen and 2540(2k) or 3820(4k) for bigger screen	(for move_point_rand() function)
-#define Point_mover_PLAIN_HEIGHT 700 * SC_MULTIPLIER // 700, 1060 for small screen and 1420(2K) or 2120(4k) for bigger screen (for move_point_rand() function)
-
-// smaller plain within the full screen
-#define SCREEN_WIDTH_PLAIN 1241 * SC_MULTIPLIER	 // 1241, 1881 (small) and 2521 or 3762 (bigger)  (for randomaizer)
-#define SCREEN_HEIGHT_PLAIN 681 * SC_MULTIPLIER // 681, 1041 (small) and 1401 or 2082 (bigger)  (for randomaizer)
-
-// fullscreen
-#define SCREEN_WIDTH 1280 * SC_MULTIPLIER  //  1280, 1920 or 2560 for bigger screens
-#define SCREEN_HEIGHT 720 * SC_MULTIPLIER // 720, 1080 or 1440 for bigger screens
-
-#define points_index 200  // punten hoeveelheid
-#define PI 3.14159265358979323846		 // pi voor de cirkel
-#define point_plain 50					 // hoever wil je de punten bewegen. ideaal is 30 of 40
-#define MAX_LIJNEN 4 //* SC_MULTIPLIER	 // hoeveel lijnen een punt kan hebben. 4 of 5 zijn ideaal
-#define MAX_DISTANCE 150
-// #define PLAIN //tester preprocessor
-
-typedef struct _point_
-{
-	int x, y;				// x en y coordinaten van elk punt
-	int targetX1, targetX2; // target puntx om het punt te bewegen
-	int targetY1, targetY2; // targt punty
-	int direction_LR;		// direction Left-right
-	int direction_UD;		// direction Up_Down
-	int lijnen;				// lijnen die connected
-	SDL_Color color_state;
-
-} point;
-
-void process_input(point *rand_punten);					// buttons en mouse input
-void proper_shutdown(void);								// shutdown
-void draw_lines(point *rand_point);						// draw lijnen tussen punten
-void cirkel_plot(int x, int y);							// cirkel plot
-void move_point_rand(point *points, int index);			// laat de punten random binnen de plain(vlak) bewegen.
-int bereken_afstend(int x1, int x2, int y1, int y2); // afstand berekenen tussen twee coordinatiess
-
-SDL_Window *window = NULL;
-SDL_Renderer *renderer = NULL;
-
-int pressed = 0;
 
 int main(int argc, char *argv[])
 {
 	(void)argc;
 	(void)argv;
-	srand((unsigned int)time(NULL));
+	srand((unsigned int)time(NULL)); //rand seed
 
-	point rand_point[points_index];
+	point rand_point[points_index]; //array init
 
-	for (int i = 0; i < points_index; i++)
+	for (int i = 0; i < points_index; i++) 
 	{
-		rand_point[i].x = (rand() % SCREEN_WIDTH_PLAIN) + 20; // maak de coordinatie vand de punt random binnen de vlak(plain)
-		rand_point[i].y = (rand() % SCREEN_HEIGHT_PLAIN) + 20;
+		rand_point[i].x = (int)(rand() % SCREEN_WIDTH_PLAIN) + 20; // maak de coordinatie vand de punt random binnen de vlak(plain)
+		rand_point[i].y = (int)(rand() % SCREEN_HEIGHT_PLAIN) + 20;
 		rand_point[i].targetX1 = rand_point[i].x + rand() % point_plain; // Random X target
 		rand_point[i].targetX2 = rand_point[i].x - rand() % point_plain; // Random X target
 		rand_point[i].targetY1 = rand_point[i].y + rand() % point_plain; // Random Y target
 		rand_point[i].targetY2 = rand_point[i].y - rand() % point_plain; // Random Y target
-		rand_point[i].direction_LR = 1;
+		rand_point[i].direction_LR = 1; // alle punten hebben 1 direction eerst
 		rand_point[i].direction_UD = 1;
 		rand_point[i].color_state.r = 255; //rest point color to white before the mouse click to white
 		rand_point[i].color_state.g = 255;
@@ -84,7 +41,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	window = SDL_CreateWindow("screensaver", SDL_WINDOWPOS_UNDEFINED,
+	window = SDL_CreateWindow("ScreenSaver", SDL_WINDOWPOS_UNDEFINED,
 							  SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT,
 							  window_flags);
 	if (window == NULL)
@@ -106,39 +63,52 @@ int main(int argc, char *argv[])
 	while (1)
 	{
 		// Refresh the backbuffer to its original state:
-		// RGB (39, 174, 96) should be a green grass color
+		// RGB (0, 0, 0) achter grond moet zwart zijn, want screensaver :)
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		SDL_RenderClear(renderer);
 
-		// Process selected inputs and pay close attention to moving				//
-		process_input(rand_point); //
+		// Process selected inputs and pay close attention to moving
+		process_input(rand_point);
 
 #ifdef PLAIN
 		// de vlak (plain) vastleggen(dit is een kliene-plain binnen de fullscreen) waar de punten gaan bewegen
+		// bijvoorbeeld 1920 min 40 dus min 20 bij elk zijde, en 1080 min 40 dus 20 bij elk zijde.
+		//					20px
+		/*|-----------------------------------|
+		  | |-------------------------------| |
+	  20px| |                               | |20px
+		  | |                               | |
+		  | |                               | |
+		  | |                               | |
+		  | |                               | |
+		  | |-------------------------------| |
+		  |-----------------------------------|
+		  					20px					*/ 
+
 		//  								  R	  G  B    A
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // red is x1900 by y1060
-		SDL_RenderDrawPoint(renderer, 1900, 1060);
+		SDL_RenderDrawPoint(renderer, Point_mover_PLAIN_WIDTH, Point_mover_PLAIN_HEIGHT);
 		cirkel_plot(1900, 1060);
 
-		SDL_RenderDrawLine(renderer, 1900, 1060, 20, 1060);
+		SDL_RenderDrawLine(renderer, Point_mover_PLAIN_WIDTH, Point_mover_PLAIN_HEIGHT, 20, Point_mover_PLAIN_HEIGHT);
 
 		SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // green is x20 by y1060
-		SDL_RenderDrawPoint(renderer, 20, 1060);
+		SDL_RenderDrawPoint(renderer, 20, Point_mover_PLAIN_HEIGHT);
 		cirkel_plot(20, 1060);
 
-		SDL_RenderDrawLine(renderer, 20, 1060, 20, 20);
+		SDL_RenderDrawLine(renderer, 20, Point_mover_PLAIN_HEIGHT, 20, 20);
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // blue is x1900 by y20
-		SDL_RenderDrawPoint(renderer, 1900, 20);
+		SDL_RenderDrawPoint(renderer, Point_mover_PLAIN_WIDTH, 20);
 		cirkel_plot(1900, 20);
 
-		SDL_RenderDrawLine(renderer, 1900, 20, 1900, 1060);
+		SDL_RenderDrawLine(renderer, Point_mover_PLAIN_WIDTH, 20, Point_mover_PLAIN_WIDTH, Point_mover_PLAIN_HEIGHT);
 
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // white is x20 by y20
 		SDL_RenderDrawPoint(renderer, 20, 20);
 		cirkel_plot(20, 20);
 
-		SDL_RenderDrawLine(renderer, 1900, 20, 20, 20);
+		SDL_RenderDrawLine(renderer, Point_mover_PLAIN_WIDTH, 20, 20, 20);
 #endif
 
 		// laat de punten gaan bewegen
@@ -150,8 +120,8 @@ int main(int argc, char *argv[])
 		// Render redrawn scene to front buffer, showing it in the
 		// actual window:
 		SDL_RenderPresent(renderer);
-		// Remember ~ 60 FPS of smooth Greta movements - PC Master Race!
-		SDL_Delay(33);
+		// how groot is fps hoe langzaam de punten bewegen
+		SDL_Delay(fps);
 	}
 
 	return 0;
@@ -326,14 +296,20 @@ void move_point_rand(point *points, int index)
 		points[q].y += points[q].direction_UD;
 
 		// Check if the point has reached a target, and reverse direction
-		if (points[q].x >= points[q].targetX1 || points[q].x <= points[q].targetX2 || points[q].x >= Point_mover_PLAIN_WIDTH || points[q].x <= 20)
+		if (points[q].x >= points[q].targetX1 || 
+			points[q].x <= points[q].targetX2 || 
+			points[q].x >= Point_mover_PLAIN_WIDTH || 
+			points[q].x <= 20)
 		{
 			points[q].direction_LR *= -1;							 // reverse direction back
 			points[q].targetX1 = points[q].x + rand() % point_plain; // recreate first target X coordinate
 			points[q].targetX2 = points[q].x - rand() % point_plain; // recreate second target X coordinate
 		}
 
-		if (points[q].y >= points[q].targetY1 || points[q].y <= points[q].targetY2 || points[q].y >= Point_mover_PLAIN_HEIGHT || points[q].y <= 20)
+		if (points[q].y >= points[q].targetY1 || 
+			points[q].y <= points[q].targetY2 || 
+			points[q].y >= Point_mover_PLAIN_HEIGHT || 
+			points[q].y <= 20)
 		{
 			points[q].direction_UD *= -1;
 			points[q].targetY1 = points[q].y + rand() % point_plain; // recreate first target Y coordinate
@@ -342,7 +318,8 @@ void move_point_rand(point *points, int index)
 	}
 }
 
-int bereken_afstend(int x1, int x2, int y1, int y2)//bereken_afstend
+//bereken afstend tussen twee punten
+int bereken_afstend(int x1, int x2, int y1, int y2)
 {
 
 	double lengte = sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2));

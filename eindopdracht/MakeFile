@@ -1,0 +1,23 @@
+# -*- MakeFile -*-
+
+# LEES EERST
+
+#target table: afhankelijkheden waarvan het uitvoerbare bestand afhankelijk is.
+# 		de actie die het bestand zal maken.[gcc]
+
+# via [make all] zal het alle uitvoerbare bestanden in één keer maken, en via [make clear] zal het elk uitvoerbare bestand verwijderen.
+#$(CC) -std=c99 -Wall -Wextra -Wpedantic -Wconversion -o screensaver main.c header.h -I/usr/include/SDL2 -D_REENTRANT -lSDL2 -lm
+CC = gcc
+CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -Wconversion
+LIBS =  -I/usr/include/SDL2 -D_REENTRANT -lSDL2 -lm 
+
+all: screensaver 
+
+
+screensaver: main.c header.h
+	$(CC) $(CFLAGS) -o screensaver main.c header.h $(LIBS)
+
+
+
+clear:
+	rm screensaver
