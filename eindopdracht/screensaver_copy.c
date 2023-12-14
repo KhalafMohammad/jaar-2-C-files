@@ -3,7 +3,7 @@
 #include <stdlib.h> //voor rand()
 #include <SDL2/SDL.h> //voor SDL-gerelateerde functies
 #include <math.h> // voor sqrt() en pow() en round()
-#include "header.h"
+#include "header.h" // mijn header
 
 
 int main(int argc, char *argv[])

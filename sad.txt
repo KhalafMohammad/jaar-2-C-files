@@ -1,0 +1,61 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+
+int main()
+{
+    int fd;
+    struct termios options;
+    char buf[255];
+
+    fd = open("/dev/ttyS0", O_RDWR | O_NOCTTY);
+    if (fd == -1)
+    {
+        perror("open_port: Unable to open /dev/ttyS0 - ");
+        return 1;
+    }
+
+    fcntl(fd, F_SETFL, 0);
+
+    tcgetattr(fd, &options);
+    cfsetispeed(&options, B9600);
+    cfsetospeed(&options, B9600);
+    options.c_cflag |= (CLOCAL | CREAD);
+    // options.c_cflag &= ~PARENB;
+    // options.c_cflag &= ~CSTOPB;
+    // options.c_cflag &= ~CSIZE;
+    options.c_cflag |= CS8;
+    // options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    // options.c_iflag &= ~(IXON | IXOFF | IXANY);
+    // options.c_oflag &= ~OPOST;
+
+    options.c_cflag &= ~(tcflag_t)PARENB;
+    options.c_cflag &= ~(tcflag_t)CSTOPB;
+    options.c_cflag &= ~(tcflag_t)CSIZE;
+    options.c_lflag &= ~(tcflag_t)(ICANON | ECHO | ECHOE | ISIG);
+    options.c_iflag &= ~(tcflag_t)(IXON | IXOFF | IXANY);
+    options.c_oflag &= ~(tcflag_t)OPOST;
+
+    tcsetattr(fd, TCSANOW, &options);
+
+    while (1)
+    {
+        int n = read(fd, buf, sizeof(buf));
+        if (n > 0)
+        {
+            buf[n] = '\0';
+            printf("Received %d bytes: %s\n", n, buf);
+            if (strcmp(buf, "X") == 0)
+            {
+                printf("Received X!\n");
+                system("python /home/thomvdv/relay-test.py");
+            }
+        }
+    }
+
+    close(fd);
+    return 0;
+}

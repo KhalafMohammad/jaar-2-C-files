@@ -1,0 +1,15 @@
+#!/usr/bin/python3
+
+import socket
+
+HOST = "0.0.0.0"  # The server's hostname or IP address
+PORT = 8989  # The port used by the server
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.connect((HOST, PORT))
+    s.sendall(b"A")
+    data = s.recv(1024)
+print("content_type: test/plain")
+print("")
+# print("this is client1 it executed sucessfully!")
+print(f"Received {data!r}")

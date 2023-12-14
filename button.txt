@@ -1,0 +1,1616 @@
+//button.py
+
+# import RPi.GPIO as GPIO
+# import time
+# GPIO.setmode(GPIO.BCM)
+# GPIO.setup(16, GPIO.IN)
+# a =3
+
+# while a>1:
+
+#     button_state = GPIO.input(16)
+#     # print("Content-type:text/plain\n\n")
+#     print(button_state)
+#     time.sleep(1)
+
+
+
+import RPi.GPIO as GPIO
+
+try:
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setup(16, GPIO.IN)
+    button_state = GPIO.input(16)
+    print(button_state)
+except Exception as e:
+    print(f"Error: {e}")
+finally:
+    GPIO.cleanup()
+
+//=======================================================================================
+
+// clinet.py
+
+# echo-client.py
+
+import socket
+
+HOST = "0.0.0.0"  # The server's hostname or IP address
+PORT = 8989  # The port used by the server
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.connect((HOST, PORT))
+    s.sendall(b"F")
+    data = s.recv(1024)
+    # while True:
+    #     message = input("Enter a message to send to the server: ")
+    #     s.sendall(message.encode())
+    #     data = s.recv(1024)
+    #     print(f"Received from server: {data.decode()}")
+
+print(f"Received {data!r}")
+
+
+//=======================================================================================
+
+//gpiodb.c
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <mariadb/mysql.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include "header.h"
+
+int *raamcheck(MYSQL *connection);
+void raamcontrol(int *columnvalue);
+static int gpiodir(int pin, int di);
+// #define test
+
+typedef struct stoplight
+{
+        int red;
+        int yellow;
+        int green;
+}STOPLIGHT;
+
+
+int main() {
+
+
+
+#ifdef test
+
+        printf("\nstoplight 1 is %d,%d,%d\n", stoplight1[0].red, stoplight1[0].yellow, stoplight1[0].green);
+    printf("\nstoplight 2 is %d,%d,%d\n", stoplight1[1].red, stoplight1[1].yellow, stoplight1[1].green);
+#endif
+
+        MYSQL *connection = mysql_init(NULL);
+        mysql_real_connect(connection, "localhost", "pipo", "theclown", "mijndb", 0, NULL, 0);
+        if(connection == NULL) {
+                printf("Kan geen verbinding met de MariaDB server maken \n");
+        exit(-1);
+        }
+
+        gpioex(21);
+        gpioex(20);
+        gpioex(16);
+
+        // sets pins as output
+        gpiodir(21,1);
+        gpiodir(20,1);
+        gpiodir(16,1);
+
+
+        while(1){
+
+                int * columnvalue =  raamcheck(connection);
+                raamcontrol(columnvalue);
+
+                free(columnvalue);
+
+                sleep(5);
+
+        }
+
+        gpiounex(21);
+        gpiounex(20);
+        gpiounex(16);
+
+
+        mysql_close(connection);
+        return 0;
+}
+
+int *raamcheck(MYSQL *connection){
+
+        int *columnvalue = malloc(6*sizeof(int));
+        int rows = 0;
+        // int columnvalue[rows];
+                // checks the value of the column LEDstate
+        if (mysql_query(connection, "select LEDstate from LED LIMIT 6")) {
+        printf("%s\n", mysql_error(connection));
+        }
+        MYSQL_ROW row;
+
+        //stores the results in the pointer resutl
+        MYSQL_RES *result = mysql_use_result(connection);
+        if(result == NULL){
+                printf("%s\n", mysql_error(connection));
+        }
+        // fetches the results in row
+        while((row = mysql_fetch_row(result)))
+        {
+                for (int j = 0; j < 6; j++)
+                {
+                        columnvalue[rows] = atoi(row[0]);
+                }
+                        rows++;
+
+
+                mysql_data_seek(result,0);
+        }
+
+#ifdef test
+        for (int i = 0; i < 6; i++)
+        {
+
+                printf("column value is: %d\n", columnvalue[i]);
+        }
+#endif
+
+
+        mysql_free_result(result);// frees the results
+
+        return columnvalue;
+}
+
+void raamcontrol(int *columnvalue){
+
+        struct stoplight stoplight1[]= {{21, 20, 16}};
+
+        int *column = malloc(6*sizeof(columnvalue));
+
+        for (int c = 0; c < 6; c++)
+        {
+                column[c] = columnvalue[c];
+                printf("col %d is %d\n", c, column[c]);
+
+        }
+        printf("\n");
+
+#ifdef test
+        for (int t = 0; t < 6; t++)
+        {
+                printf("colllllllll is %d\n", column[c]);
+        }
+
+#endif
+
+        if(column[0] == 1){
+
+                //if columnvalue is other than 1 sets pin21 valuse to 1
+
+                gpiowrite(stoplight1[0].green, 1); //temp hoger
+        usleep(500000);
+        gpiowrite(stoplight1[0].green, 0);
+
+        }else if(column[0] != 1){
+
+                //if columnvalue is other than 1 sets pin21 valuse to 0
+
+                        gpiowrite(stoplight1[0].green, 1);//temp lager
+                usleep(1000000);
+                gpiowrite(stoplight1[0].green, 0);
+        }
+        if(column[1] == 1){
+
+                //if columnvalue is equal to 1, then sets pin17 to 1
+                gpiowrite(stoplight1[0].yellow, 0);// automatisch
+        gpiowrite(stoplight1[0].red, 0);
+
+        }//else if(column[1] != 1){
+
+        //      //if columnvalue is other than 1 sets pin17 valuse to 0
+        //      gpiowrite(stoplight1[1].green,0);
+
+        //}
+        if(column[2] == 1){
+
+                //if columnvalue is equal to 1, then sets pin20 to 1.
+                gpiowrite(stoplight1[0].yellow, 1);
+        gpiowrite(stoplight1[0].red, 0);//open
+
+        }//else if(column[2] != 1){
+
+                //if columnvalue is other than 1 sets pin20 valuse to 0
+        //      gpiowrite(stoplight1[0].yellow,0);
+        // }
+        if(column[3] == 1){
+
+                //if columnvalue is equal to 1, then sets pin27 to 1.
+                gpiowrite(stoplight1[0].yellow, 0);// dicht
+        gpiowrite(stoplight1[0].red, 1);
+
+        }
+        // else if(column[3] != 1){
+
+        //      //if columnvalue is other than 1 sets pin27 valuse to 0
+        //      gpiowrite(stoplight1[1].yellow,0);
+
+        // }
+        // if(column[4] == 1){
+
+        //      //if columnvalue is equal to 1, then sets pin16 to 1.
+        //      gpiowrite(stoplight1[0].green,1);
+
+        // }else if(column[4] != 1){
+
+        //      //if columnvalue is other than 1 sets pin16 valuse to 0
+
+        //      gpiowrite(stoplight1[0].green,0);
+
+        // }
+
+        // if(column[5] == 1){
+
+        //      //if columnvalue is equal to 1, then sets pin22 to 1.
+
+        //      gpiowrite(stoplight1[1].red,1);
+
+
+
+        // }else if(column[5] != 1){
+
+        //      //if columnvalue is other than 1 sets pin22 valuse to 0
+        //      gpiowrite(stoplight1[1].red,0);
+
+        // }
+}
+
+#define IN 0
+
+static int gpiodir(int pin, int di){
+
+    static const char s_directions_str[]  = "in\0out";
+    int fd;
+        char path[50];
+        sprintf (path, "/sys/class/gpio/gpio%d/direction", pin);
+        fd = open(path, O_WRONLY);
+        if(fd == -1){
+
+                fprintf(stderr,"faild to open directory dir.");
+        }
+
+    write(fd, &s_directions_str[IN == di ? 0 :3], IN == di ? 2: 3);
+
+
+        close(fd);
+    return 0;
+}
+
+//=======================================================================================
+
+//header.c
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <mariadb/mysql.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+
+void gpiowrite(int pin, int hor){
+
+        int fd;
+        char path[50];
+        sprintf (path, "/sys/class/gpio/gpio%d/value", pin);
+        fd = open(path, O_WRONLY);
+        if(fd == -1){
+
+                fprintf(stderr,"faild to open directory write.");
+        }
+
+        char value[5];
+        sprintf(value,"%d",hor);
+    write(fd,  value, 1);
+
+
+        close(fd);
+}
+
+void gpioex(int pin){
+
+    int fd;
+    char path[56];
+    sprintf(path,"/sys/class/gpio/export");
+    fd = open(path, O_WRONLY);
+    if(fd == -1){
+
+                fprintf(stderr,"faild to open directory export.");
+        }
+
+    char value[16];
+    sprintf(value, "%d", pin);
+    write(fd, value, 2);
+    close(fd);
+
+}
+
+void gpiounex(int pin){
+
+
+    int fd;
+    char path[56];
+    sprintf(path,"/sys/class/gpio/unexport");
+    fd = open(path, O_WRONLY);
+    if(fd == -1){
+
+                fprintf(stderr,"faild to open directory unex.");
+        }
+
+    char value[16];
+    sprintf(value, "%d", pin);
+    write(fd, value, 2);
+    close(fd);
+}
+
+// #define IN 0
+
+// static int gpiodir(int pin, int di){
+
+//     static const char s_directions_str[]  = "in\0out";
+//     int fd;
+//      char path[50];
+//      sprintf (path, "/sys/class/gpio/gpio%d/direction", pin);
+//      fd = open(path, O_WRONLY);
+//      if(fd == -1){
+
+//              fprintf(stderr,"faild to open directory dir.");
+//      }
+
+//     write(fd, &s_directions_str[IN == di ? 0 :3], IN == di ? 2: 3);
+
+
+//      close(fd);
+//     return 0;
+// }
+//=======================================================================================
+header.h
+
+
+
+
+void gpiowrite(int pin, int hor);
+static int gpiodir(int pin, int di);
+void gpioex(int pin);
+void gpiounex(int pin);
+//=======================================================================================
+
+knoptest.c
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <mariadb/mysql.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include "header.h"
+
+void gpiowrite(int pin, int hor); // opens the value file of the output pin and writs 1 OR 0
+static int gpiodir(int pin, int di);//opens the direction file of the pin and wirites out or in
+void gpioex(int pin);//exports the given pin
+void gpiounex(int pin); //unexports the given pin
+static int gpioread(int pin);//reads the value in the value file of the input pin
+
+#define POUT 1 //dir out
+#define PIN 0 //dir in
+#define OFF 1 //led off
+#define ON 0 //led on
+#define button1 16 //button 1
+#define button2 23 //button 2
+
+struct stoplight{ //struct of stoplights
+
+    int red;
+    int yellow;
+    int green;
+};
+
+
+int main(){
+
+    struct stoplight stoplight1[] = {21,20,26}; //stoplight 1
+    struct stoplight stoplight2[] = {22,27,17}; //stoplight 2
+
+    //exports all required pins
+    gpioex(button1);
+    gpioex(button2);
+    gpioex(stoplight1->red);
+    gpioex(stoplight1->green);
+    gpioex(stoplight1->yellow);
+    gpioex(stoplight2->green);
+    gpioex(stoplight2->yellow);
+    gpioex(stoplight2->red);
+
+    //sets all required pin to either output or input
+    gpiodir(stoplight1->green, POUT);
+    gpiodir(stoplight1->yellow, POUT);
+    gpiodir(stoplight1->red, POUT);
+    gpiodir(stoplight2->green, POUT);
+    gpiodir(stoplight2->yellow, POUT);
+    gpiodir(stoplight2->red, POUT);
+    gpiodir(button1,PIN);
+    gpiodir(button2,PIN);
+
+    while(1){
+        //reads value off of the input pins files
+        int value1 = gpioread(16);
+        int value2 = gpioread(23);
+        printf("value1 and value2 :%d | %d\n", value1, value2); //prints values of input pins
+
+
+        if (value1 == 1){
+                // if button 1 is pressed then stoplight 1 goes ON
+            gpiowrite(stoplight1->green,ON);
+            gpiowrite(stoplight1->yellow,OFF);
+            gpiowrite(stoplight1->red,OFF);
+            sleep(2);
+            gpiowrite(stoplight1->green,OFF);
+            gpiowrite(stoplight1->yellow,ON);
+            gpiowrite(stoplight1->red,OFF);
+            sleep(2);
+            gpiowrite(stoplight1->green,OFF);
+            gpiowrite(stoplight1->yellow,OFF);
+            gpiowrite(stoplight1->red,ON);
+            sleep(1);
+        }else if(value2 == 1){
+                // if button 2 is pressed then stoplight 2 goes ON
+            gpiowrite(stoplight2->green, ON);
+            gpiowrite(stoplight2->yellow, OFF);
+            gpiowrite(stoplight2->red, OFF);
+            sleep(2);
+            gpiowrite(stoplight2->green, OFF);
+            gpiowrite(stoplight2->yellow, ON);
+            gpiowrite(22, OFF);
+            sleep(2);
+            gpiowrite(stoplight2->green, OFF);
+            gpiowrite(stoplight2->yellow, OFF);
+            gpiowrite(stoplight2->red, ON);
+            sleep(2);
+        }
+        else{
+            //if no button is pressed then trun all off except red leds.
+            gpiowrite(stoplight1->green, OFF);
+            gpiowrite(stoplight1->yellow, OFF);
+            gpiowrite(stoplight1->red, ON);
+
+            gpiowrite(stoplight2->green, OFF);
+            gpiowrite(stoplight2->yellow, OFF);
+            gpiowrite(stoplight2->red, ON);
+        }
+
+        usleep(100000);
+    }
+
+
+    return 0;
+}
+
+void gpiowrite(int pin, int hor){
+
+        int fd;
+        char path[50];
+        sprintf (path, "/sys/class/gpio/gpio%d/value", pin);
+        fd = open(path, O_WRONLY);
+        if(fd == -1){
+
+                fprintf(stderr,"faild to open directory for write.");
+        }
+
+        char value[5];
+        sprintf(value,"%d",hor);
+    write(fd,  value, 1);
+
+
+        close(fd);
+}
+
+void gpioex(int pin){
+
+    int fd;
+    char path[56];
+    sprintf(path,"/sys/class/gpio/export");
+    fd = open(path, O_WRONLY);
+    if(fd == -1){
+
+                fprintf(stderr,"faild to open directory for export.");
+        }
+
+    char value[16];
+    sprintf(value, "%d", pin);
+    write(fd, value, 2);
+    close(fd);
+
+}
+
+void gpiounex(int pin){
+
+
+    int fd;
+    char path[56];
+    sprintf(path,"/sys/class/gpio/unexport");
+    fd = open(path, O_WRONLY);
+    if(fd == -1){
+
+                fprintf(stderr,"faild to open directory for unexport.");
+        }
+
+    char value[16];
+    sprintf(value, "%d", pin);
+    write(fd, value, 2);
+    close(fd);
+}
+
+
+#define IN 0
+static int gpiodir(int pin, int dir)
+{
+        static const char s_directions_str[]  = "in\0out";
+
+#define DIRECTION_MAX 35
+        char path[DIRECTION_MAX];
+        int fd;
+
+        snprintf(path, DIRECTION_MAX, "/sys/class/gpio/gpio%d/direction", pin);
+        fd = open(path, O_WRONLY);
+        if (-1 == fd) {
+                fprintf(stderr, "Failed to open gpio direction for writing!\n");
+                return(-1);
+        }
+
+        if (-1 == write(fd, &s_directions_str[IN == dir ? 0 : 3], IN == dir ? 2 : 3)) {
+                fprintf(stderr, "Failed to set direction!\n");
+                return(-1);
+        }
+
+        close(fd);
+        return(0);
+}
+
+static int gpioread(int pin)
+{
+#define VALUE_MAX 30
+        char path[VALUE_MAX];
+        char value_str[3];
+        int fd;
+
+        snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", pin);
+        fd = open(path, O_RDONLY);
+        if (-1 == fd) {
+                fprintf(stderr, "Failed to open gpio value for reading!\n");
+                return(-1);
+        }
+
+        if (-1 == read(fd, value_str, 3)) {
+                fprintf(stderr, "Failed to read value!\n");
+                return(-1);
+        }
+
+        close(fd);
+
+        return(atoi(value_str)); //atoi converts char string to intger and return returns the value of the dir
+}
+//=======================================================================================
+
+# -*- MakeFile -*-
+
+# READ FIRST
+
+#target table: dependencies that the exicutable file depends ON.
+#       the action that will make the file.[gcc]
+
+# via [make all] it will make all the exicutable file at once, and via [make clear] it will delete every exicutable.
+
+all: gpiodb server
+
+
+gpiodb: header.h gpiodb.c
+        gcc -Wall -Wextra -Wconversion -o gpiodb gpiodb.c header.c header.h $$(mariadb_config --include --libs)
+
+server: header.h server.c
+        gcc -Wall -Wextra -Wconversion -o server server.c header.c header.h $$(mariadb_config --include --libs)
+
+clear:
+        rm server gpiodb
+//=======================================================================================
+protocol.c
+
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <mariadb/mysql.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include "header.h"
+
+void gpiowrite(int pin, int hor); // opens the value file of the output pin and writs 1 OR 0
+static int gpiodir(int pin, int di);//opens the direction file of the pin and wirites out or in
+void gpioex(int pin);//exports the given pin
+void gpiounex(int pin); //unexports the given pin
+static int gpioread(int pin);//reads the value in the value file of the input pin
+
+// int main(){
+//     gpioex(21);
+//     gpiodir(21,1);
+//     gpioex(16);
+//     gpiodir(16,1);
+
+//     while(1){
+//         gpiowrite(20, 0);
+//         gpiowrite(21, 0);
+//         sleep(1);
+//         gpiowrite(16, 1);
+//         sleep(1);
+//         gpiowrite(21, 1);
+//         sleep(1);
+//         gpiowrite(16, 0);
+//         sleep(1);
+//         gpiowrite(20, 1);
+//         usleep(100000);
+//         gpiowrite(20, 0);
+//     // int value2 = gpioread(21);
+//     // printf("value1 and value2: %d\n", value2); //prints values of input pins
+//     // usleep(100000);
+
+//     }
+
+//     return 0;
+// }
+
+// Raspberry Pi code
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+int main()
+{
+    int fd;                                       // file descriptor for serial device
+    // char buffer[256];                             // buffer for data
+    int n;                                        // number of bytes read or written
+    int value;
+    struct termios options;                       // options for serial communication
+    fd = open("/dev/ttyS0", O_RDWR | O_NOCTTY); // open serial device
+    if (fd == -1)
+    {
+        perror("Unable to open serial device");
+        exit(1);
+    }
+    tcgetattr(fd, &options);
+    // get current options
+    cfsetispeed(&options, B9600);               // set input baud rate
+    cfsetospeed(&options, B9600);               // set output baud rate
+    options.c_cflag &= ~PARENB;                 // disable parity
+    options.c_cflag &= ~CSTOPB;                 // set one stop bit
+    options.c_cflag &= ~CSIZE;                  // mask data size
+    options.c_cflag |= CS8;                     // set 8 bits per character
+    options.c_cflag |= CREAD | CLOCAL;          // enable receiver and ignore modem control lines
+    options.c_iflag &= ~(IXON | IXOFF | IXANY); // disable software flow control
+    options.c_oflag &= ~OPOST;
+
+    // disable output processing
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    // set raw mode
+    options.c_cc[VMIN] = 4;          // set minimum number of characters to read
+    options.c_cc[VTIME] = 0;          // set timeout in deciseconds
+    tcsetattr(fd, TCSANOW, &options); // set new options
+    fcntl(fd, F_SETFL, 0);
+    while (1)
+    {
+        // printf("Enter a message: ");
+        // fgets(buffer, sizeof(buffer), stdin);
+        // // get user input
+        // n = write(fd, buffer, strlen(buffer));
+        // // write to serial device
+        // if (n < 0)
+        // {
+        //     perror("Write failed");
+        //     exit(1);
+        // }
+        // printf("Sent %d bytes\n", n);
+
+
+        n = read(fd, &value, sizeof(int));
+        // read from serial device
+        // value = atoi(buffer);
+        if (n < 0)
+        {
+            perror("Read failed");
+            exit(1);
+        }
+        // buffer[n] = '\0';
+
+        // terminate string
+        printf("Received %d bytes: %d\n", n, value);
+
+
+        // if (read(fd, buffer, sizeof(buffer)) > 0)
+        // {
+        //     char* token = strtok(buffer, "\n");
+        //     while (token != NULL)
+        //     {
+        //         value = atoi(token);
+        //         printf("Received value: %d\n", value);
+        //         token = strtok(NULL, "\n");
+        //     }
+        // }
+
+    }
+    close(fd);
+    // close serial device
+    return 0;
+}
+
+
+
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <unistd.h>
+// #include <fcntl.h>
+// #include <termios.h>
+
+// int main()
+// {
+//     int fd;
+//     struct termios options;
+//     char buf[255];
+
+//     fd = open("/dev/ttyS0", O_RDWR | O_NOCTTY);
+//     if (fd == -1)
+//     {
+//         perror("open_port: Unable to open /dev/ttyS0 - ");
+//         return 1;
+//     }
+
+//     fcntl(fd, F_SETFL, 0);
+
+//     tcgetattr(fd, &options);
+//     cfsetispeed(&options, B9600);
+//     cfsetospeed(&options, B9600);
+//     options.c_cflag |= (CLOCAL | CREAD);
+//     // options.c_cflag &= ~PARENB;
+//     // options.c_cflag &= ~CSTOPB;
+//     // options.c_cflag &= ~CSIZE;
+//     options.c_cflag |= CS8;
+//     // options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+//     // options.c_iflag &= ~(IXON | IXOFF | IXANY);
+//     // options.c_oflag &= ~OPOST;
+
+//     options.c_cflag &= ~(tcflag_t)PARENB;
+//     options.c_cflag &= ~(tcflag_t)CSTOPB;
+//     options.c_cflag &= ~(tcflag_t)CSIZE;
+//     options.c_lflag &= ~(tcflag_t)(ICANON | ECHO | ECHOE | ISIG);
+//     options.c_iflag &= ~(tcflag_t)(IXON | IXOFF | IXANY);
+//     options.c_oflag &= ~(tcflag_t)OPOST;
+
+//     tcsetattr(fd, TCSANOW, &options);
+
+//     while (1)
+//     {
+//         int n = read(fd, buf, sizeof(buf));
+//         if (n > 0)
+//         {
+//             buf[n] = '\0';
+//             printf("Received %d bytes: %c\n", n, buf);
+//             if (strcmp(buf, "X") == 0)
+//             {
+//                 printf("Received X!\n");
+//                 // system("python /home/thomvdv/relay-test.py");
+//             }
+//         }
+//     }
+
+//     close(fd);
+//     return 0;
+// }
+
+
+
+
+
+void gpiowrite(int pin, int hor){
+
+        int fd;
+        char path[50];
+        sprintf (path, "/sys/class/gpio/gpio%d/value", pin);
+        fd = open(path, O_WRONLY);
+        if(fd == -1){
+
+                fprintf(stderr,"faild to open directory for write.");
+        }
+
+        char value[5];
+        sprintf(value,"%d",hor);
+    write(fd,  value, 1);
+
+
+        close(fd);
+}
+
+void gpioex(int pin){
+
+    int fd;
+    char path[56];
+    sprintf(path,"/sys/class/gpio/export");
+    fd = open(path, O_WRONLY);
+    if(fd == -1){
+
+                fprintf(stderr,"faild to open directory for export.");
+        }
+
+    char value[16];
+    sprintf(value, "%d", pin);
+    write(fd, value, 2);
+    close(fd);
+
+}
+
+void gpiounex(int pin){
+
+
+    int fd;
+    char path[56];
+    sprintf(path,"/sys/class/gpio/unexport");
+    fd = open(path, O_WRONLY);
+    if(fd == -1){
+
+                fprintf(stderr,"faild to open directory for unexport.");
+        }
+
+    char value[16];
+    sprintf(value, "%d", pin);
+    write(fd, value, 2);
+    close(fd);
+}
+
+
+#define IN 0
+static int gpiodir(int pin, int dir)
+{
+        static const char s_directions_str[]  = "in\0out";
+
+#define DIRECTION_MAX 35
+        char path[DIRECTION_MAX];
+        int fd;
+
+        snprintf(path, DIRECTION_MAX, "/sys/class/gpio/gpio%d/direction", pin);
+        fd = open(path, O_WRONLY);
+        if (-1 == fd) {
+                fprintf(stderr, "Failed to open gpio direction for writing!\n");
+                return(-1);
+        }
+
+        if (-1 == write(fd, &s_directions_str[IN == dir ? 0 : 3], IN == dir ? 2 : 3)) {
+                fprintf(stderr, "Failed to set direction!\n");
+                return(-1);
+        }
+
+        close(fd);
+        return(0);
+}
+
+static int gpioread(int pin)
+{
+#define VALUE_MAX 30
+        char path[VALUE_MAX];
+        char value_str[3];
+        int fd;
+
+        snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", pin);
+        fd = open(path, O_RDONLY);
+        if (-1 == fd) {
+                fprintf(stderr, "Failed to open gpio value for reading!\n");
+                return(-1);
+        }
+
+        if (-1 == read(fd, value_str, 3)) {
+                fprintf(stderr, "Failed to read value!\n");
+                return(-1);
+        }
+
+        close(fd);
+
+        return(atoi(value_str)); //atoi converts char string to intger and return returns the value of the dir
+}
+
+//=======================================================================================
+pyserver.py
+
+# echo-server.py
+
+import socket
+
+HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
+PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind((HOST, PORT))
+    s.listen()
+    conn, addr = s.accept()
+    with conn:
+        print(f"Connected by {addr}")
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            conn.sendall(data)
+
+//=======================================================================================
+server.c 
+
+
+/* A simple server in the internet domain using TCP
+   The port number is passed as an argument
+   This version runs forever, forking off a separate
+   process for each connection
+*/
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stddef.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <mariadb/mysql.h>
+#include "header.h"
+
+//void query_write(MYSQL *connection,int ledstate, int ledID);
+
+// This function is called when a system call fails. It displays a message about the error on stderr and then aborts the program.
+void error(const char *msg)
+{
+    perror(msg);
+    exit(1);
+}
+
+int main(int argc, char *argv[])
+{
+
+    MYSQL *connection = mysql_init(NULL);
+    mysql_real_connect(connection, "localhost", "pipo", "theclown", "mijndb", 0, NULL, 0);
+    if (connection == NULL)
+    {
+        printf("Kan geen verbinding met de MariaDB server maken \n");
+        exit(-1);
+    }
+
+    int sockfd, newsockfd, portno; /*sockfd and newsockfd variables store the values returned by the socket system call and the accept system call.
+                                     portno stores the port number on which the server accepts connections.*/
+
+    socklen_t clilen; // stores the size of the address of the client. This is needed for the accept system call.
+
+    char buffer[256]; // The server reads characters from the socket connection into this buffer.
+
+    struct sockaddr_in serv_addr, cli_addr; // structure containing an internet address. This structure is defined in netinet/in.h.
+
+    int n; // n is the return value for the read() and write() calls; i.e. it contains the number of characters read or written.
+
+    if (argc < 2) // This code displays an error message
+    {
+        fprintf(stderr, "ERROR, no port provided\n");
+        exit(1);
+    }
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0); /*The socket() system call creates a new socket. It takes three arguments.
+                                                The first is the address domain of the socket.*/
+
+    if (sockfd < 0)
+    {
+        error("ERROR opening socket");
+    }
+
+    bzero((char *)&serv_addr, sizeof(serv_addr)); /*The function bzero() sets all values in a buffer to zero. It takes two arguments,
+                                                   the first is a pointer to the buffer and the second is the size of the buffer.
+                                                    Thus, this line initializes serv_addr to zeros.*/
+
+    portno = atoi(argv[1]); /* The port number on which the server will listen for connections is passed in as an argument,
+                              and this statement uses the atoi() function to convert this from a string of digits to an integer. */
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(portno);
+
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    { // The bind() system call binds a socket to an address,
+        error("ERROR on binding");
+    }
+
+    listen(sockfd, 5); // The listen system call allows the process to listen on the socket for connections.
+    clilen = sizeof(cli_addr);
+
+    while (1)
+    {
+        // The accept() system call causes the process to block until a client connects to the server.
+        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+
+        if (newsockfd < 0)
+        {
+            error("ERROR on accept");
+        }
+
+        bzero(buffer, 256); // initializes the buffer using the bzero() function, and then reads from the socket.
+        n = read(newsockfd, buffer, 255);
+        if (n < 0)
+        {
+            error("ERROR reading from socket");
+        }
+
+        printf("Here is the message: %s\n", buffer); // prints out what the client sent.
+
+        if (strncmp(buffer, "A", 1) == 0)
+        {
+            if (mysql_query(connection, "UPDATE LED SET LEDstate = '1' WHERE ledID = 1;"))
+            {
+                printf("%s\n", mysql_error(connection));
+            }
+        }
+        if (strncmp(buffer, "B", 1) == 0)
+        {
+            if (mysql_query(connection, "UPDATE LED SET LEDstate = '0' WHERE ledID = 1;"))
+            {
+                printf("%s\n", mysql_error(connection));
+            }
+        }
+
+        if (strncmp(buffer, "C", 1) == 0)
+        {
+            if (mysql_query(connection, "UPDATE LED SET LEDstate = '1' WHERE ledID = 3;"))
+            {
+                printf("%s\n", mysql_error(connection));
+            }
+        }
+        if (strncmp(buffer, "D", 1) == 0)
+        {
+            if (mysql_query(connection, "UPDATE LED SET LEDstate = '1' WHERE ledID = 4;"))
+            {
+                printf("%s\n", mysql_error(connection));
+            }
+        }
+        if (strncmp(buffer, "E", 1) == 0)
+        {
+            if (mysql_query(connection, "UPDATE LED SET LEDstate = '1' WHERE ledID = 5;"))
+            {
+                printf("%s\n", mysql_error(connection));
+            }
+        }
+        if (strncmp(buffer, "F", 1) == 0)
+        {
+            if (mysql_query(connection, "UPDATE LED SET LEDstate = '1' WHERE ledID = 6;"))
+            {
+                printf("%s\n", mysql_error(connection));
+            }
+        }
+
+
+        n = write(newsockfd, "I got your message", 18); /*Once a connection has been established,
+                                                          both ends can both read and write to the connection.*/
+        if (n < 0)
+            error("ERROR writing to socket");
+        close(newsockfd);
+    }
+
+    close(sockfd);
+    mysql_close(connection);
+    return 0;
+}
+
+// void query_write(MYSQL *connection,int ledstate, int ledID){
+//     char query[56];
+//     sprintf(query, "UPDATE LED SET LEDstate = '%d' WHERE ledID = %d;",ledstate, ledID);
+//     if (mysql_query(connection, query))
+//             {
+//                 printf("%s\n", mysql_error(connection));
+//             }
+
+// }
+
+//=======================================================================================
+bashtest12.c
+
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+
+int main(int ac, char **ap) {
+
+ int file_descriptor;
+ file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "17", 2);
+ close(file_descriptor);
+ sleep(1);
+
+  file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "23", 2);
+ close(file_descriptor);
+ sleep(1);
+
+
+  file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "27", 2);
+ close(file_descriptor);
+ sleep(1);
+
+
+ file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "22", 2);
+ close(file_descriptor);
+ sleep(1);
+
+
+file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "16", 2);
+ close(file_descriptor);
+ sleep(1);
+
+  file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "20", 2);
+ close(file_descriptor);
+ sleep(1);
+
+
+ file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "21", 2);
+ close(file_descriptor);
+ sleep(1);
+
+
+
+ file_descriptor = open("/sys/class/gpio/gpio17/direction", O_WRONLY);
+ write(file_descriptor, "out", 3);
+ close(file_descriptor);
+
+  file_descriptor = open("/sys/class/gpio/gpio23/direction", O_WRONLY);
+ write(file_descriptor, "in", 2);
+ close(file_descriptor);
+
+
+  file_descriptor = open("/sys/class/gpio/gpio27/direction", O_WRONLY);
+ write(file_descriptor, "out", 3);
+ close(file_descriptor);
+
+
+  file_descriptor = open("/sys/class/gpio/gpio22/direction", O_WRONLY);
+ write(file_descriptor, "out", 3);
+ close(file_descriptor);
+
+
+  file_descriptor = open("/sys/class/gpio/gpio16/direction", O_WRONLY);
+ write(file_descriptor, "out", 3);
+ close(file_descriptor);
+
+
+  file_descriptor = open("/sys/class/gpio/gpio20/direction", O_WRONLY);
+ write(file_descriptor, "out", 3);
+ close(file_descriptor);
+
+   file_descriptor = open("/sys/class/gpio/gpio21/direction", O_WRONLY);
+ write(file_descriptor, "out", 3);
+ close(file_descriptor);
+
+
+
+
+
+ int True = 4;
+ while(True == 4){
+
+
+
+
+        sleep(1);
+        file_descriptor = open("/sys/class/gpio/gpio17/value", O_WRONLY);
+        write(file_descriptor, "0", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio27/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio22/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio16/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio20/value", O_WRONLY);
+        write(file_descriptor, "0", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio21/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        sleep(1);
+
+        file_descriptor = open("/sys/class/gpio/gpio17/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio27/value", O_WRONLY);
+        write(file_descriptor, "0", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio22/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio16/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio20/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio21/value", O_WRONLY);
+        write(file_descriptor, "0", 1);
+        close(file_descriptor);
+
+        sleep(1);
+
+
+        file_descriptor = open("/sys/class/gpio/gpio17/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio27/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio22/value", O_WRONLY);
+        write(file_descriptor, "0", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio16/value", O_WRONLY);
+        write(file_descriptor, "0", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio20/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+        file_descriptor = open("/sys/class/gpio/gpio21/value", O_WRONLY);
+        write(file_descriptor, "1", 1);
+        close(file_descriptor);
+
+
+ }
+
+
+ //file_descriptor = open("/sys/class/gpio/unexport", O_WRONLY);
+ //write(file_descriptor, "21", 2);
+ //close(file_descriptor);
+ return 0;
+}
+//=======================================================================================
+daemon.c  #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <syslog.h>
+#include <stddef.h>
+#include <mariadb/mysql.h>
+#include <fcntl.h>
+
+
+int ledcheck(MYSQL *connection){
+        int columnvalue = 0;
+
+                // checks the value of the column LEDstate
+                if (mysql_query(connection, "select * from LED")) {
+                printf("%s\n", mysql_error(connection));
+                }
+                MYSQL_ROW row;
+
+                //stores the results in the pointer resutl
+                MYSQL_RES *result = mysql_store_result(connection);
+                if(result == NULL){
+                        printf("%s\n", mysql_error(connection));
+                }
+
+                // fetches the results in row
+                row = mysql_fetch_row(result);
+
+                // saves the value of the row under the LEDstate column in columnvalue and turns it to an integer.
+                columnvalue = atoi(row[2]);
+
+                //prints the value of the column to make sure that its working.
+                printf("column value is: %d\n", columnvalue);
+                mysql_free_result(result);// frees the results
+
+                //strcmp function compares string columnvalue with either 1(true) or 0(false)
+                return columnvalue;
+}
+
+void ledcontrol(int columnvalue){
+        int file_descriptor;
+        if(columnvalue == 1){
+
+                        //if columnvalue is equal to 1, then sets pin21 to 1.
+                        file_descriptor = open("/sys/class/gpio/gpio21/value", O_WRONLY);
+                        write(file_descriptor, "1", 1);
+                        close(file_descriptor);
+
+
+
+                }else
+
+                        //if columnvalue is other than 1 sets pin21 valuse to 0
+                        file_descriptor = open("/sys/class/gpio/gpio21/value", O_WRONLY);
+                        write(file_descriptor, "0", 1);
+                        close(file_descriptor);
+
+
+}
+
+// static
+// void daemoniztionque(){
+
+//      FILE *fp = NULL;
+
+//      pid_t process_id;
+//      pid_t sid = 0;
+
+//     // create Child process
+
+//     process_id = fork();
+
+
+//      /* Success: Let the parent terminate */
+//      if(process_id < 0){
+
+//              // exit(EXIT_FAILURE);
+//              printf("fork failed!\n");
+//              exit(1);
+//      }
+
+//      if(process_id > 0){
+//              printf("process_id : %d\n", process_id);
+//              // exit(EXIT_SUCCESS);
+//              exit(0);
+//      }
+
+//      umask(0);
+
+
+//      /* On success: The child process becomes session leader */
+//      sid = setsid();
+
+//      if(sid < 0){
+//              //exit(EXIT_FAILURE);
+//              exit(1);
+
+//      }
+
+//      //change to root
+
+//      chdir("/");
+
+//      close(STDIN_FILENO);
+//      close(STDOUT_FILENO);
+//      close(STDERR_FILENO);
+//      fp = fopen("log.txt", "w+");
+
+//      // for (int x = sysconf(_SC_OPEN_MAX); x>0; x--)
+//     // {
+//     //     close (x);
+//     // }
+
+
+//      // openlog("secdaemon", LOG_PID, LOG_DAEMON);
+
+
+// }
+
+
+int main(int ac, char **ap){
+        MYSQL *connection = mysql_init(NULL);
+        mysql_real_connect(connection, "localhost", "pipo", "theclown", "mijndb", 0, NULL, 0);
+        if(connection == NULL) {
+                printf("Kan geen verbinding met de MariaDB server maken \n");
+        exit(-1);
+        }
+
+        FILE *fp = NULL;
+
+        pid_t process_id;
+        pid_t sid = 0;
+
+    // create Child process
+
+    process_id = fork();
+
+
+        /* Success: Let the parent terminate */
+        if(process_id < 0){
+
+                // exit(EXIT_FAILURE);
+                printf("fork failed!\n");
+                exit(1);
+        }
+
+        if(process_id > 0){
+                printf("process_id : %d\n", process_id);
+                // exit(EXIT_SUCCESS);
+                exit(0);
+        }
+
+        umask(0);
+
+
+        /* On success: The child process becomes session leader */
+        sid = setsid();
+
+        if(sid < 0){
+                //exit(EXIT_FAILURE);
+                exit(1);
+
+        }
+
+        //change to root
+
+        chdir("/");
+
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        fp = fopen("Log.txt", "w+");
+
+
+
+
+        int file_descriptor;
+        //exports pin21
+        file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+        write(file_descriptor, "21", 2);
+        close(file_descriptor);
+        sleep(1);
+
+        // sets pin21 as output
+        file_descriptor = open("/sys/class/gpio/gpio21/direction", O_WRONLY);
+        write(file_descriptor, "out", 3);
+        close(file_descriptor);
+        // daemoniztionque();
+
+        while(1){
+
+
+                fprintf(fp, "logging info...");
+                fflush(fp);
+                int status = ledcheck(connection);
+                printf("cloumnvalue is: %d\n", status);
+                ledcontrol(status);
+
+                sleep(10);
+
+
+                }
+                //logout "sort of", and log that the daemon is terminatid.
+                // syslog (LOG_NOTICE, "First daemon terminated.");
+                fclose(fp);
+                // closelog();
+                mysql_close(connection);
+
+return 0;
+}
+
+//=======================================================================================
+test.c
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+//#define test
+
+
+int main() {
+
+ int file_descriptor;
+ file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "24", 2);
+ close(file_descriptor);
+ sleep(1);
+
+  file_descriptor = open("/sys/class/gpio/export", O_WRONLY);
+ write(file_descriptor, "16", 2);
+ close(file_descriptor);
+ sleep(1);
+
+
+
+ file_descriptor = open("/sys/class/gpio/gpio16/direction", O_WRONLY);
+ write(file_descriptor, "out", 3);
+ close(file_descriptor);
+
+
+  file_descriptor = open("/sys/class/gpio/gpio24/direction", O_WRONLY);
+ write(file_descriptor, "in", 2);
+ close(file_descriptor);
+
+
+
+ int button1, buttonLED, button_state, pstate;
+ button1 = open("/sys/class/gpio/gpio24/value", O_WRONLY);
+
+buttonLED = open("/sys/class/gpio/gpio16/value", O_WRONLY);
+
+pstate= open("/sys/class/gpio/gpio24/pull", O_WRONLY);
+write(pstate, "up", 2);
+close(pstate);
+
+
+ //int True = 4;
+ while(1){
+
+         read(button1, &button_state, 1);
+#ifdef test
+printf("this the button value: %d\n", button_state);
+sleep(2);
+#endif
+        //if(button_state != pstate){
+                        //usleep(10000);
+                        //read(button1, &button_state, 1);
+                //}
+
+        if (button_state == 0){
+                printf("button was pressed!\n");
+                write(buttonLED, "0", 1);
+                close(buttonLED);
+
+
+        }else{
+                write(buttonLED, "1", 1);
+                close(buttonLED);
+
+                }
+
+ }
+
+
+ //file_descriptor = open("/sys/class/gpio/unexport", O_WRONLY);
+ //write(file_descriptor, "21", 2);
+ //close(file_descriptor);
+ return 0;
+}
+
